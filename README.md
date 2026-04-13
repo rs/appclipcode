@@ -6,8 +6,12 @@
 App Clip Code format.
 
 Apple ships those circular App Clip Codes, but does not document the format.
-This project reverse engineered the full pipeline and rebuilt it in multiple
-implementations.
+This repo reverse engineered the full pipeline and rebuilt it in JavaScript and
+Go.
+
+The JS lib can generate App Clip Codes directly in the browser. The Go version
+can generate, decode, and scan them from images. Both match Apple's generator
+on accepted URLs.
 
 It can:
 
@@ -17,13 +21,17 @@ It can:
 - decode URLs back from SVGs
 - decode from raster images through the CLI and `ReadImage`
 
-Under the hood, it reimplements:
-
-1. URL compression
-2. payload encoding with Reed-Solomon error correction
-3. App Clip Code SVG rendering
-
 The reverse-engineering write-up lives in [doc/SPEC.md](./doc/SPEC.md).
+
+## Why I Built This
+
+I got interested in this while working on App Clip invocation flows.
+
+Ever played a Netflix game on a TV and paired your phone as the controller? That seamless pairing flow used an App Clip on iPhone, but the code on screen had to be a normal QR code because the controller device might be Android and App Clip Codes are Apple-only. Each pairing session needed its own invocation URL, so the QR code had to be generated dynamically.
+
+Later I was prototyping an iPhone-only install-and-configure flow for NextDNS. Same general problem, but without the cross-platform constraint. A QR code would still have been perfectly sufficient. That made App Clip Codes completely unnecessary and therefore irresistible.
+
+That turned into a reverse-engineering project.
 
 ## Implementations
 
@@ -35,16 +43,6 @@ This repository currently includes two implementations:
   encoder path and SVG generation, usable directly in the browser, with a
   local `appclipcode` CLI
 
-## Why I Built This
-
-I got interested in this while working on App Clip invocation flows.
-
-Ever played a Netflix game on a TV and paired your phone as the controller? That seamless pairing flow used an App Clip on iPhone, but the code on screen had to be a normal QR code because the controller device might be Android and App Clip Codes are Apple-only. The URL behind it was dynamic, so the code also had to be generated from fresh session state.
-
-Later I was prototyping an iPhone-only install-and-configure flow for NextDNS. Same general problem, but without the cross-platform constraint. A QR code would still have been perfectly sufficient. That made App Clip Codes completely unnecessary and therefore irresistible.
-
-That turned into a reverse-engineering project.
-
 ## What Was Hard
 
 Rendering the rings was the easy part. The hard part was matching Apple's actual encoding and validation rules:
@@ -55,6 +53,16 @@ Rendering the rings was the easy part. The hard part was matching Apple's actual
 - segmented path/query subtype selection
 - generator-compatible URL validation
 - the 128-bit payload limit
+
+In the end, the format turned out to be a mix of fairly standard building
+blocks, especially multi-context Huffman coding driven by Apple-trained
+frequency tables, combined with very Apple-specific host tables, path
+wordbooks, and URL acceptance rules.
+
+Those constraints are also why App Clip Codes are not a very good generic QR
+code replacement: they are iOS-only, accept only a narrow subset of URLs, and
+depend on a compression scheme with a tight payload budget plus App Clip-specific
+frequency tables, host tables, and wordbooks.
 
 ## LLMs and Reverse Engineering
 
