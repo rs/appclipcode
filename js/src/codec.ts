@@ -158,7 +158,9 @@ class PackedHuffmanTrie {
   readonly maxDepth = 2;
   readonly symbolIndexBits: number;
   readonly shapeBitsPerNode: number;
-  readonly bitsPerNode: number;
+  readonly leafBitsPerNode: number;
+  readonly shapeBytes: number;
+  readonly leafBitOffset: number;
 
   constructor(
     private readonly data: Uint8Array,
@@ -168,9 +170,11 @@ class PackedHuffmanTrie {
     this.numSymbols = symbols.length;
     this.symbolIndexBits = Math.ceil(Math.log2(this.numSymbols));
     this.shapeBitsPerNode = this.numSymbols * 2 - 1;
-    this.bitsPerNode = this.shapeBitsPerNode + this.numSymbols * this.symbolIndexBits;
     const expectedNodes = 1 + this.numSymbols + this.numSymbols * this.numSymbols;
-    const expectedSize = Math.ceil((expectedNodes * this.bitsPerNode) / 8);
+    this.leafBitsPerNode = this.numSymbols * this.symbolIndexBits;
+    this.shapeBytes = Math.ceil((expectedNodes * this.shapeBitsPerNode) / 8);
+    this.leafBitOffset = this.shapeBytes * 8;
+    const expectedSize = this.shapeBytes + Math.ceil((expectedNodes * this.leafBitsPerNode) / 8);
     if (data.length !== expectedSize) {
       throw new Error(`trie ${filename}: expected ${expectedSize} bytes, got ${data.length}`);
     }
@@ -178,17 +182,16 @@ class PackedHuffmanTrie {
 
   buildCoder(nodeOffset: number): StaticHuffmanCoder {
     const codes = new Array<string>(this.numSymbols).fill("");
-    const nodeBitOffset = nodeOffset * this.bitsPerNode;
-
-    let bitOffset = nodeBitOffset;
+    let shapeBitOffset = nodeOffset * this.shapeBitsPerNode;
+    let leafBitOffset = this.leafBitOffset + nodeOffset * this.leafBitsPerNode;
 
     const walk = (prefix: string): void => {
-      const isLeaf = this.readBit(bitOffset);
-      bitOffset += 1;
+      const isLeaf = this.readBit(shapeBitOffset);
+      shapeBitOffset += 1;
 
       if (isLeaf) {
-        const symbolIndex = this.readBits(bitOffset, this.symbolIndexBits);
-        bitOffset += this.symbolIndexBits;
+        const symbolIndex = this.readBits(leafBitOffset, this.symbolIndexBits);
+        leafBitOffset += this.symbolIndexBits;
         codes[symbolIndex] = prefix === "" ? "0" : prefix;
         return;
       }
@@ -199,8 +202,11 @@ class PackedHuffmanTrie {
 
     walk("");
 
-    if (bitOffset !== nodeBitOffset + this.bitsPerNode) {
-      throw new Error(`trie node ${nodeOffset}: malformed codebook bitstream`);
+    if (shapeBitOffset !== (nodeOffset + 1) * this.shapeBitsPerNode) {
+      throw new Error(`trie node ${nodeOffset}: malformed shape bitstream`);
+    }
+    if (leafBitOffset !== this.leafBitOffset + (nodeOffset + 1) * this.leafBitsPerNode) {
+      throw new Error(`trie node ${nodeOffset}: malformed leaf bitstream`);
     }
 
     return new StaticHuffmanCoder(codes);

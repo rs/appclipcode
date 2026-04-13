@@ -24,8 +24,7 @@ The current package covers the generator path only and is tested against:
 Runtime note:
 
 - the trie codebooks are compiled into the package in a compact compressed form,
-  so the library
-  does not fetch or load separate data files at runtime
+  so the library does not fetch or load separate data files at runtime
 - the library runtime is compatible with both browsers and Node.js
 
 ## Requirements

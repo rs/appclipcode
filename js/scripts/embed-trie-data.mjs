@@ -41,16 +41,17 @@ function packTrie(data, filename, symbols) {
     throw new Error(`trie ${filename}: expected ${expectedSize} bytes, got ${data.length}`);
   }
 
-  const writer = new BitWriter();
-  writer.setSymbolIndexBits(Math.ceil(Math.log2(numSymbols)));
+  const symbolIndexBits = Math.ceil(Math.log2(numSymbols));
+  const shapeWriter = new BitWriter();
+  const leafWriter = new BitWriter();
 
   for (let nodeOffset = 0; nodeOffset < nodeCount; nodeOffset += 1) {
     const frequencies = readFrequencies(data, nodeOffset * rowSize, numSymbols);
     const tree = buildTree(frequencies, symbols, filename, nodeOffset);
-    writeTree(writer, tree);
+    writeTree(shapeWriter, leafWriter, tree, symbolIndexBits);
   }
 
-  return writer.finish();
+  return Buffer.concat([shapeWriter.finish(), leafWriter.finish()]);
 }
 
 function readFrequencies(data, base, numSymbols) {
@@ -108,16 +109,16 @@ function compareNodes(a, b) {
   return 0;
 }
 
-function writeTree(writer, node) {
+function writeTree(shapeWriter, leafWriter, node, symbolIndexBits) {
   if (!node.left && !node.right) {
-    writer.writeBit(true);
-    writer.writeBits(node.symbolIndex, writer.symbolIndexBits);
+    shapeWriter.writeBit(true);
+    leafWriter.writeBits(node.symbolIndex, symbolIndexBits);
     return;
   }
 
-  writer.writeBit(false);
-  writeTree(writer, node.left);
-  writeTree(writer, node.right);
+  shapeWriter.writeBit(false);
+  writeTree(shapeWriter, leafWriter, node.left, symbolIndexBits);
+  writeTree(shapeWriter, leafWriter, node.right, symbolIndexBits);
 }
 
 class BitWriter {
@@ -125,17 +126,11 @@ class BitWriter {
     this.bytes = [];
     this.currentByte = 0;
     this.bitsInCurrentByte = 0;
-    this.symbolIndexBits = 0;
   }
 
   bytes;
   currentByte;
   bitsInCurrentByte;
-  symbolIndexBits;
-
-  setSymbolIndexBits(bits) {
-    this.symbolIndexBits = bits;
-  }
 
   writeBit(bit) {
     this.currentByte = (this.currentByte << 1) | (bit ? 1 : 0);
