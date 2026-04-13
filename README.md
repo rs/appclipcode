@@ -1,6 +1,6 @@
 # App Clip Codes, Reverse Engineered
 
-<img src="assets/demo.svg" width="200" align="right">
+<img src="doc/demo.svg" width="200" align="right">
 
 `appclipcode` provides Go and JavaScript/TypeScript implementations of Apple's
 App Clip Code format.
@@ -23,7 +23,7 @@ Under the hood, it reimplements:
 2. payload encoding with Reed-Solomon error correction
 3. App Clip Code SVG rendering
 
-The reverse-engineering write-up lives in [SPEC.md](./SPEC.md).
+The reverse-engineering write-up lives in [doc/SPEC.md](./doc/SPEC.md).
 
 ## Implementations
 
@@ -75,179 +75,44 @@ That includes:
 - segmented path/query subtype selection
 - generator-compatible URL validation and the 128-bit payload limit
 
-## Install
+## Getting Started
 
 ### Go
 
-Library:
+Install:
 
 ```bash
 go get github.com/rs/appclipcode
-```
-
-CLI:
-
-```bash
 go install github.com/rs/appclipcode/cmd/appclipcodegen@latest
 ```
 
-### JavaScript / TypeScript
-
-Install the published package from npm:
-
-```bash
-npm install appclipcode
-```
-
-Use the published CLI directly from npm:
-
-```bash
-npx appclipcode https://example.com --index 0 -o code.svg
-```
-
-The source for the JS implementation lives in [`js/`](./js).
-
-## Quick Start
-
-### Go CLI
-
-Generate an SVG:
+CLI example:
 
 ```bash
 appclipcodegen gen https://example.com -o code.svg
 ```
 
-Scan a code back to a URL:
-
-```bash
-appclipcodegen scan code.svg
-```
-
-List the built-in visual templates:
-
-```bash
-appclipcodegen templates
-```
+More details: [doc/GODOC.md](./doc/GODOC.md)
 
 ### JavaScript / TypeScript
 
-Generate an SVG with a built-in template from the JS package:
+Install:
+
+```bash
+npm install appclipcode
+```
+
+CLI example:
 
 ```bash
 npx appclipcode https://example.com --index 0 -o code.svg
 ```
 
-Generate an SVG with custom colors:
-
-```bash
-npx appclipcode https://example.com --fg FFFFFF --bg 000000 -o code.svg
-```
-
-Generate from code with a predefined template:
-
-```ts
-import { generateWithTemplate } from "appclipcode";
-
-const svg = generateWithTemplate("https://example.com", 0);
-```
-
-Generate from code with custom colors:
-
-```ts
-import { generate } from "appclipcode";
-
-const svg = generate("https://example.com", "FFFFFF", "000000");
-```
-
-## Library Usage
-
-Generate an SVG with a predefined template:
-
-```go
-package main
-
-import (
-	"os"
-
-	"github.com/rs/appclipcode"
-)
-
-func main() {
-	svg, err := appclipcode.GenerateWithTemplate("https://example.com", 0, nil)
-	if err != nil {
-		panic(err)
-	}
-	if err := os.WriteFile("code.svg", svg, 0o644); err != nil {
-		panic(err)
-	}
-}
-```
-
-Generate with custom colors:
-
-```go
-svg, err := appclipcode.Generate("https://example.com", "FFFFFF", "000000", nil)
-```
-
-Use NFC mode:
-
-```go
-svg, err := appclipcode.GenerateWithTemplate(
-	"https://example.com",
-	4,
-	&appclipcode.Options{
-		Type: appclipcode.CodeTypeNFC,
-	},
-)
-```
-
-Decode from SVG:
-
-```go
-url, err := appclipcode.ReadSVG(svgBytes)
-```
-
-Decode from an image:
-
-```go
-url, err := appclipcode.ReadImage(imageBytes)
-```
-
-## CLI Usage
-
-Generate an SVG:
-
-```bash
-appclipcodegen gen https://example.com -output code.svg
-```
-
-Generate with custom colors:
-
-```bash
-appclipcodegen gen https://example.com -fg FFFFFF -bg 000000 -o code.svg
-```
-
-Generate an NFC code:
-
-```bash
-appclipcodegen gen https://example.com -index 4 -type nfc -o code.svg
-```
-
-List templates:
-
-```bash
-appclipcodegen templates
-```
-
-Scan a code back to a URL:
-
-```bash
-appclipcodegen scan code.svg
-```
+More details: [js/README.md](./js/README.md)
 
 ## Reverse-Engineering Notes
 
-The full write-up is in [SPEC.md](./SPEC.md).
+The full write-up is in [doc/SPEC.md](./doc/SPEC.md).
 
 Some of the more useful findings:
 
