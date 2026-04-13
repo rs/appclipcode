@@ -32,7 +32,8 @@ This repository currently includes two implementations:
 - Go: the main library and CLI in the repository root, with generation,
   SVG decoding, and raster-image scanning support
 - JavaScript / TypeScript: the package in [`js/`](./js), focused on the
-  encoder path and SVG generation, with a local `appclipcode` CLI
+  encoder path and SVG generation, usable directly in the browser, with a
+  local `appclipcode` CLI
 
 ## Why I Built This
 
@@ -107,6 +108,8 @@ CLI example:
 ```bash
 npx appclipcode https://example.com --index 0 -o code.svg
 ```
+
+The JS library can also run directly in the browser; only the CLI is Node-specific.
 
 More details: [js/README.md](./js/README.md)
 

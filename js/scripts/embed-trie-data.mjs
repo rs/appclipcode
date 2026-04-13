@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -8,9 +9,9 @@ const dataDir = path.join(rootDir, "data");
 const outputFile = path.join(rootDir, "src", "trie-data.generated.ts");
 
 const files = [
-  { name: "h.data", exportName: "HOST_TRIE_BASE64" },
-  { name: "cpq.data", exportName: "CPQ_TRIE_BASE64" },
-  { name: "spq.data", exportName: "SPQ_TRIE_BASE64" },
+  { name: "h.data", exportName: "HOST_TRIE_DEFLATE_BASE64" },
+  { name: "cpq.data", exportName: "CPQ_TRIE_DEFLATE_BASE64" },
+  { name: "spq.data", exportName: "SPQ_TRIE_DEFLATE_BASE64" },
 ];
 
 const lines = [
@@ -21,8 +22,9 @@ const lines = [
 
 for (const file of files) {
   const content = fs.readFileSync(path.join(dataDir, file.name));
-  const base64 = content.toString("base64");
-  lines.push(`export const ${file.exportName} =`);
+  const compressed = zlib.deflateRawSync(content, { level: 9 });
+  const base64 = compressed.toString("base64");
+  lines.push(`export const ${file.exportName}: string =`);
   lines.push(`  ${JSON.stringify(base64)};`);
   lines.push("");
 }

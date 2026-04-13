@@ -25,6 +25,9 @@
     "prepack": "npm run build",
     "test": "npm run build && node --test test/*.test.mjs"
   },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
   "devDependencies": {
     "@types/node": "^22.15.2",
     "typescript": "^5.8.3"

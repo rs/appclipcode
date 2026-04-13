@@ -8,10 +8,11 @@ import {
   SPQ_SYMBOLS,
 } from "./codec-data.js";
 import {
-  CPQ_TRIE_BASE64,
-  HOST_TRIE_BASE64,
-  SPQ_TRIE_BASE64,
+  CPQ_TRIE_DEFLATE_BASE64,
+  HOST_TRIE_DEFLATE_BASE64,
+  SPQ_TRIE_DEFLATE_BASE64,
 } from "./trie-data.generated.js";
+import { inflateSync } from "fflate";
 
 interface FormatParams {
   gapsDataCount: number;
@@ -335,9 +336,9 @@ function ensureInit(): void {
   }
 
   try {
-    hostCoder = new MultiContextHuffmanCoder(loadTrie(HOST_TRIE_BASE64, "h.data", HOST_SYMBOLS));
-    cpqCoder = new MultiContextHuffmanCoder(loadTrie(CPQ_TRIE_BASE64, "cpq.data", CPQ_SYMBOLS));
-    spqCoder = new MultiContextHuffmanCoder(loadTrie(SPQ_TRIE_BASE64, "spq.data", SPQ_SYMBOLS));
+    hostCoder = new MultiContextHuffmanCoder(loadTrie(HOST_TRIE_DEFLATE_BASE64, "h.data", HOST_SYMBOLS));
+    cpqCoder = new MultiContextHuffmanCoder(loadTrie(CPQ_TRIE_DEFLATE_BASE64, "cpq.data", CPQ_SYMBOLS));
+    spqCoder = new MultiContextHuffmanCoder(loadTrie(SPQ_TRIE_DEFLATE_BASE64, "spq.data", SPQ_SYMBOLS));
   } catch (error) {
     initError = error instanceof Error ? error : new Error(String(error));
     throw initError;
@@ -345,7 +346,7 @@ function ensureInit(): void {
 }
 
 function loadTrie(base64: string, filename: string, symbols: string[]): SymbolFrequencyTrie {
-  const data = decodeBase64(base64);
+  const data = inflateSync(decodeBase64(base64));
   return new SymbolFrequencyTrie(data, symbols, filename);
 }
 
