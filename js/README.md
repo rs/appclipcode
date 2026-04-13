@@ -21,6 +21,12 @@ The current package covers the generator path only and is tested against:
 - bundled URL compression vectors
 - bundled Apple reference SVG fixtures
 
+Runtime note:
+
+- the trie data is compiled into the package, so the library does not fetch or
+  load separate data files at runtime
+- the library runtime is compatible with both browsers and Node.js
+
 ## Requirements
 
 - Node.js `>=18`
@@ -68,6 +74,15 @@ Generate with custom foreground and background colors:
 import { generate } from "appclipcode";
 
 const svg = generate("https://example.com", "FFFFFF", "000000");
+```
+
+Generate an inline SVG data URL:
+
+```ts
+import { generateWithTemplate } from "appclipcode";
+
+const svg = generateWithTemplate("https://example.com", 0);
+const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 ```
 
 Generate an NFC-style code instead of the camera-style code:
@@ -364,8 +379,6 @@ This package does not currently try to provide:
 
 - decoding support
 - camera or raster scanning support
-- browser bundling guarantees
-- a CLI
 
 If those are needed, they should be added as separate scope rather than implied
 by the encoder package.

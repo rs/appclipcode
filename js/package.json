@@ -15,14 +15,14 @@
     }
   },
   "files": [
-    "dist",
-    "data"
+    "dist"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/embed-trie-data.mjs && tsc -p tsconfig.json",
+    "prepack": "npm run build",
     "test": "npm run build && node --test test/*.test.mjs"
   },
   "devDependencies": {

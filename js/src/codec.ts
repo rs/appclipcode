@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   CPQ_SYMBOLS,
   FIXED_TLD_INDEX,
@@ -10,6 +7,11 @@ import {
   KNOWN_WORD_INDEX,
   SPQ_SYMBOLS,
 } from "./codec-data.js";
+import {
+  CPQ_TRIE_BASE64,
+  HOST_TRIE_BASE64,
+  SPQ_TRIE_BASE64,
+} from "./trie-data.generated.js";
 
 interface FormatParams {
   gapsDataCount: number;
@@ -32,7 +34,6 @@ const FORMATS: Record<0 | 1, FormatParams> = {
   1: { gapsDataCount: 11, gapsParityCount: 2, arcsDataCount: 5, arcsParityCount: 2 },
 };
 
-const DATA_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../data");
 const TEMPLATE_BITS = [false, true, false, true, false, true, false, false];
 const FIXED6_ALPHABET = ".0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|";
 const FIXED6_INDEX = new Map<string, number>(
@@ -151,7 +152,7 @@ class SymbolFrequencyTrie {
   readonly maxDepth = 2;
 
   constructor(
-    private readonly data: Buffer,
+    private readonly data: Uint8Array,
     readonly symbols: string[],
     filename: string,
   ) {
@@ -334,18 +335,63 @@ function ensureInit(): void {
   }
 
   try {
-    hostCoder = new MultiContextHuffmanCoder(loadTrie("h.data", HOST_SYMBOLS));
-    cpqCoder = new MultiContextHuffmanCoder(loadTrie("cpq.data", CPQ_SYMBOLS));
-    spqCoder = new MultiContextHuffmanCoder(loadTrie("spq.data", SPQ_SYMBOLS));
+    hostCoder = new MultiContextHuffmanCoder(loadTrie(HOST_TRIE_BASE64, "h.data", HOST_SYMBOLS));
+    cpqCoder = new MultiContextHuffmanCoder(loadTrie(CPQ_TRIE_BASE64, "cpq.data", CPQ_SYMBOLS));
+    spqCoder = new MultiContextHuffmanCoder(loadTrie(SPQ_TRIE_BASE64, "spq.data", SPQ_SYMBOLS));
   } catch (error) {
     initError = error instanceof Error ? error : new Error(String(error));
     throw initError;
   }
 }
 
-function loadTrie(filename: string, symbols: string[]): SymbolFrequencyTrie {
-  const data = fs.readFileSync(path.join(DATA_DIR, filename));
+function loadTrie(base64: string, filename: string, symbols: string[]): SymbolFrequencyTrie {
+  const data = decodeBase64(base64);
   return new SymbolFrequencyTrie(data, symbols, filename);
+}
+
+function decodeBase64(base64: string): Uint8Array {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const lookup = new Uint8Array(256);
+  lookup.fill(255);
+
+  for (let i = 0; i < alphabet.length; i += 1) {
+    lookup[alphabet.charCodeAt(i)] = i;
+  }
+
+  const sanitized = base64.replace(/\s+/g, "");
+  const padding =
+    (sanitized.endsWith("==") ? 2 : 0) ||
+    (sanitized.endsWith("=") ? 1 : 0);
+  const outputLength = Math.floor((sanitized.length * 3) / 4) - padding;
+  const output = new Uint8Array(outputLength);
+
+  let outIndex = 0;
+
+  for (let i = 0; i < sanitized.length; i += 4) {
+    const a = lookup[sanitized.charCodeAt(i)];
+    const b = lookup[sanitized.charCodeAt(i + 1)];
+    const cChar = sanitized[i + 2];
+    const dChar = sanitized[i + 3];
+    const c = cChar === "=" ? 0 : lookup[sanitized.charCodeAt(i + 2)];
+    const d = dChar === "=" ? 0 : lookup[sanitized.charCodeAt(i + 3)];
+
+    const value = (a << 18) | (b << 12) | (c << 6) | d;
+
+    output[outIndex] = (value >> 16) & 0xff;
+    outIndex += 1;
+
+    if (cChar !== "=" && outIndex < output.length) {
+      output[outIndex] = (value >> 8) & 0xff;
+      outIndex += 1;
+    }
+
+    if (dChar !== "=" && outIndex < output.length) {
+      output[outIndex] = value & 0xff;
+      outIndex += 1;
+    }
+  }
+
+  return output;
 }
 
 function tldHuffmanCoder(): HuffmanCoder {
