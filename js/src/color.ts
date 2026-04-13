@@ -3,10 +3,15 @@ export class Color {
     public readonly r: number,
     public readonly g: number,
     public readonly b: number,
+    public readonly a: number = 0xff,
   ) {}
 
   hex(): string {
-    return `#${toHex(this.r)}${toHex(this.g)}${toHex(this.b)}`;
+    if (this.a === 0xff) {
+      return `#${toHex(this.r)}${toHex(this.g)}${toHex(this.b)}`;
+    }
+
+    return `#${toHex(this.r)}${toHex(this.g)}${toHex(this.b)}${toHex(this.a)}`;
   }
 }
 
@@ -26,14 +31,15 @@ function toHex(n: number): string {
 
 export function parseHexColor(value: string): Color {
   const normalized = String(value).replace(/^#/, "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    throw new Error(`color must be 6 hex digits, got ${JSON.stringify(normalized)}`);
+  if (!/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(normalized)) {
+    throw new Error(`color must be 6 or 8 hex digits, got ${JSON.stringify(normalized)}`);
   }
 
   return new Color(
     Number.parseInt(normalized.slice(0, 2), 16),
     Number.parseInt(normalized.slice(2, 4), 16),
     Number.parseInt(normalized.slice(4, 6), 16),
+    normalized.length === 8 ? Number.parseInt(normalized.slice(6, 8), 16) : 0xff,
   );
 }
 
@@ -42,6 +48,7 @@ export function midpointColor(a: Color, b: Color): Color {
     Math.floor((a.r + b.r) / 2),
     Math.floor((a.g + b.g) / 2),
     Math.floor((a.b + b.b) / 2),
+    Math.floor((a.a + b.a) / 2),
   );
 }
 
@@ -91,17 +98,18 @@ export function templateByIndex(index: number): Palette {
 }
 
 export function findThirdColor(foreground: Color, background: Color): Color {
+  const alpha = Math.floor((foreground.a + background.a) / 2);
   for (const palette of basePalettes) {
-    if (sameColor(palette.foreground, foreground) && sameColor(palette.background, background)) {
-      return palette.third;
+    if (sameRGB(palette.foreground, foreground) && sameRGB(palette.background, background)) {
+      return new Color(palette.third.r, palette.third.g, palette.third.b, alpha);
     }
-    if (sameColor(palette.foreground, background) && sameColor(palette.background, foreground)) {
-      return palette.third;
+    if (sameRGB(palette.foreground, background) && sameRGB(palette.background, foreground)) {
+      return new Color(palette.third.r, palette.third.g, palette.third.b, alpha);
     }
   }
   return midpointColor(foreground, background);
 }
 
-function sameColor(a: Color, b: Color): boolean {
+function sameRGB(a: Color, b: Color): boolean {
   return a.r === b.r && a.g === b.g && a.b === b.b;
 }

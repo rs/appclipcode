@@ -46,8 +46,8 @@ func printUsage() {
 
 Generate options:
   -url URL        URL to encode (must be https://)
-  -fg HEX         Foreground color as 6-digit hex (e.g. 000000)
-  -bg HEX         Background color as 6-digit hex (e.g. FFFFFF)
+  -fg HEX         Foreground color as 6- or 8-digit hex (e.g. 000000 or 00000080)
+  -bg HEX         Background color as 6- or 8-digit hex (e.g. FFFFFF or FFFFFF80)
   -index N        Use predefined template color (0-17, default: 0 when -fg/-bg are omitted)
   -type TYPE      Code type: cam (default) or nfc
   -o FILE         Output file path (default: stdout)

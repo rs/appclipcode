@@ -81,15 +81,15 @@ func testTemplatePalette(index int) (Palette, error) {
 	switch index {
 	case 0:
 		return Palette{
-			Foreground: Color{0xFF, 0xFF, 0xFF},
-			Background: Color{0x00, 0x00, 0x00},
-			Third:      Color{0x88, 0x88, 0x88},
+			Foreground: Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+			Background: Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
+			Third:      Color{R: 0x88, G: 0x88, B: 0x88, A: 0xFF},
 		}, nil
 	case 1:
 		return Palette{
-			Foreground: Color{0x00, 0x00, 0x00},
-			Background: Color{0xFF, 0xFF, 0xFF},
-			Third:      Color{0x88, 0x88, 0x88},
+			Foreground: Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
+			Background: Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+			Third:      Color{R: 0x88, G: 0x88, B: 0x88, A: 0xFF},
 		}, nil
 	default:
 		return Palette{}, fmt.Errorf("unsupported test template index %d", index)

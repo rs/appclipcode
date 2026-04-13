@@ -48,6 +48,18 @@ test("cli rejects partial custom color input", () => {
   assert.match(result.stderr, /specify both --fg and --bg/);
 });
 
+test("cli accepts 8-digit hex colors", () => {
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, "https://example.com", "--fg", "FFFFFF80", "--bg", "00000000", "--type", "nfc"],
+    { encoding: "utf8" },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /stroke:#ffffff80/);
+  assert.match(result.stdout, /fill:#00000000/);
+});
+
 test("cli lists templates", () => {
   const result = spawnSync(process.execPath, [cliPath, "templates"], {
     encoding: "utf8",

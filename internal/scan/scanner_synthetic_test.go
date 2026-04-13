@@ -161,12 +161,12 @@ func renderRasterCode(t *testing.T, url string, template, diameter int) *image.N
 	cx := float64(diameter) / 2
 	cy := float64(diameter) / 2
 
-	bgCol := color.NRGBA{R: pal.Background.R, G: pal.Background.G, B: pal.Background.B, A: 255}
+	bgCol := color.NRGBA{R: pal.Background.R, G: pal.Background.G, B: pal.Background.B, A: pal.Background.A}
 	drawFilledCircle(img, cx, cy, bgRadius*scale, bgCol)
 
 	posState := buildPosState(bits)
-	fgCol := color.NRGBA{R: pal.Foreground.R, G: pal.Foreground.G, B: pal.Foreground.B, A: 255}
-	thirdCol := color.NRGBA{R: pal.Third.R, G: pal.Third.G, B: pal.Third.B, A: 255}
+	fgCol := color.NRGBA{R: pal.Foreground.R, G: pal.Foreground.G, B: pal.Foreground.B, A: pal.Foreground.A}
+	thirdCol := color.NRGBA{R: pal.Third.R, G: pal.Third.G, B: pal.Third.B, A: pal.Third.A}
 
 	offset := 0
 	for ringIndex := 0; ringIndex < len(ringBitCounts); ringIndex++ {
@@ -474,15 +474,15 @@ func testTemplatePalette(index int) (appsvg.Palette, error) {
 	switch index {
 	case 0:
 		return appsvg.Palette{
-			Foreground: appsvg.Color{0xFF, 0xFF, 0xFF},
-			Background: appsvg.Color{0x00, 0x00, 0x00},
-			Third:      appsvg.Color{0x88, 0x88, 0x88},
+			Foreground: appsvg.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+			Background: appsvg.Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
+			Third:      appsvg.Color{R: 0x88, G: 0x88, B: 0x88, A: 0xFF},
 		}, nil
 	case 1:
 		return appsvg.Palette{
-			Foreground: appsvg.Color{0x00, 0x00, 0x00},
-			Background: appsvg.Color{0xFF, 0xFF, 0xFF},
-			Third:      appsvg.Color{0x88, 0x88, 0x88},
+			Foreground: appsvg.Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
+			Background: appsvg.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+			Third:      appsvg.Color{R: 0x88, G: 0x88, B: 0x88, A: 0xFF},
 		}, nil
 	default:
 		return appsvg.Palette{}, fmt.Errorf("unsupported test template index %d", index)

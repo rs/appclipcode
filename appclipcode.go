@@ -19,6 +19,8 @@ package appclipcode
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/rs/appclipcode/internal/codec"
 	appscan "github.com/rs/appclipcode/internal/scan"
@@ -56,7 +58,8 @@ func NewRSEncoder(gf *GaloisField, numParity int) *RSEncoder {
 }
 
 // Generate creates an App Clip Code SVG for the given URL with the specified colors.
-// Colors are 6-digit hex RGB strings (e.g. "FF3B30").
+// Colors are 6- or 8-digit hex strings (e.g. "FF3B30" or "FF3B30CC").
+// When alpha is omitted, it defaults to opaque.
 // The third color is looked up from the preset palette if the fg/bg combination
 // matches a known template, otherwise it is computed as the midpoint.
 func Generate(rawURL, foreground, background string, opts *Options) ([]byte, error) {
@@ -65,19 +68,22 @@ func Generate(rawURL, foreground, background string, opts *Options) ([]byte, err
 	}
 	opts.defaults()
 
-	fg, err := ParseHexColor(foreground)
+	fg, err := parseHexSVGColor(foreground)
 	if err != nil {
 		return nil, fmt.Errorf("foreground: %w", err)
 	}
-	bg, err := ParseHexColor(background)
+	bg, err := parseHexSVGColor(background)
 	if err != nil {
 		return nil, fmt.Errorf("background: %w", err)
 	}
 
-	third := findThirdColor(fg, bg)
-	pal := Palette{Foreground: fg, Background: bg, Third: third}
+	pal := appsvg.Palette{
+		Foreground: fg,
+		Background: bg,
+		Third:      findThirdSVGColor(fg, bg),
+	}
 
-	return generateWithPalette(rawURL, pal, opts)
+	return generateWithSVGPalette(rawURL, pal, opts)
 }
 
 // GenerateWithTemplate creates an App Clip Code SVG using a predefined color template (0-17).
@@ -96,6 +102,10 @@ func GenerateWithTemplate(rawURL string, templateIndex int, opts *Options) ([]by
 }
 
 func generateWithPalette(rawURL string, pal Palette, opts *Options) ([]byte, error) {
+	return generateWithSVGPalette(rawURL, svgPalette(pal), opts)
+}
+
+func generateWithSVGPalette(rawURL string, pal appsvg.Palette, opts *Options) ([]byte, error) {
 	// Step 1: Compress URL to 16 bytes
 	compressed, err := CompressURL(rawURL)
 	if err != nil {
@@ -109,7 +119,7 @@ func generateWithPalette(rawURL string, pal Palette, opts *Options) ([]byte, err
 	}
 
 	// Step 3: Render SVG
-	svg := RenderSVG(allBits, pal, rawURL, opts.Type)
+	svg := appsvg.RenderSVG(allBits, pal, rawURL, appsvg.CodeType(opts.Type))
 	return svg, nil
 }
 
@@ -163,8 +173,70 @@ func findThirdColor(fg, bg Color) Color {
 
 func svgPalette(p Palette) appsvg.Palette {
 	return appsvg.Palette{
-		Foreground: appsvg.Color{R: p.Foreground.R, G: p.Foreground.G, B: p.Foreground.B},
-		Background: appsvg.Color{R: p.Background.R, G: p.Background.G, B: p.Background.B},
-		Third:      appsvg.Color{R: p.Third.R, G: p.Third.G, B: p.Third.B},
+		Foreground: appsvg.Color{R: p.Foreground.R, G: p.Foreground.G, B: p.Foreground.B, A: 0xFF},
+		Background: appsvg.Color{R: p.Background.R, G: p.Background.G, B: p.Background.B, A: 0xFF},
+		Third:      appsvg.Color{R: p.Third.R, G: p.Third.G, B: p.Third.B, A: 0xFF},
 	}
+}
+
+func parseHexSVGColor(s string) (appsvg.Color, error) {
+	s = strings.TrimPrefix(s, "#")
+	if len(s) != 6 && len(s) != 8 {
+		return appsvg.Color{}, fmt.Errorf("color must be 6 or 8 hex digits, got %q", s)
+	}
+
+	component := func(start int) (uint8, error) {
+		v, err := strconv.ParseUint(s[start:start+2], 16, 8)
+		if err != nil {
+			return 0, fmt.Errorf("invalid hex color %q: %w", s, err)
+		}
+		return uint8(v), nil
+	}
+
+	r, err := component(0)
+	if err != nil {
+		return appsvg.Color{}, err
+	}
+	g, err := component(2)
+	if err != nil {
+		return appsvg.Color{}, err
+	}
+	b, err := component(4)
+	if err != nil {
+		return appsvg.Color{}, err
+	}
+
+	a := uint8(0xFF)
+	if len(s) == 8 {
+		a, err = component(6)
+		if err != nil {
+			return appsvg.Color{}, err
+		}
+	}
+
+	return appsvg.Color{R: r, G: g, B: b, A: a}, nil
+}
+
+func findThirdSVGColor(fg, bg appsvg.Color) appsvg.Color {
+	alpha := uint8((int(fg.A) + int(bg.A)) / 2)
+
+	for _, p := range basePalettes {
+		if sameRGB(fg, p.Foreground) && sameRGB(bg, p.Background) {
+			return appsvg.Color{R: p.Third.R, G: p.Third.G, B: p.Third.B, A: alpha}
+		}
+		if sameRGB(fg, p.Background) && sameRGB(bg, p.Foreground) {
+			return appsvg.Color{R: p.Third.R, G: p.Third.G, B: p.Third.B, A: alpha}
+		}
+	}
+
+	return appsvg.Color{
+		R: uint8((int(fg.R) + int(bg.R)) / 2),
+		G: uint8((int(fg.G) + int(bg.G)) / 2),
+		B: uint8((int(fg.B) + int(bg.B)) / 2),
+		A: alpha,
+	}
+}
+
+func sameRGB(a appsvg.Color, b Color) bool {
+	return a.R == b.R && a.G == b.G && a.B == b.B
 }

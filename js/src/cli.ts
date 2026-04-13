@@ -225,8 +225,8 @@ Examples:
 
 Options:
   --index N       Built-in template index (0-17). Defaults to 0.
-  --fg HEX        Foreground color as 6-digit hex.
-  --bg HEX        Background color as 6-digit hex.
+  --fg HEX        Foreground color as 6- or 8-digit hex.
+  --bg HEX        Background color as 6- or 8-digit hex.
   --type TYPE     Code type: cam (default) or nfc.
   -o, --output    Output file path. Defaults to stdout.
   -h, --help      Show this help text.

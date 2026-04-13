@@ -66,6 +66,24 @@ func TestGenerateNFC(t *testing.T) {
 	}
 }
 
+func TestGenerateSupportsAlphaHexColors(t *testing.T) {
+	svg, err := appclipcode.Generate("https://example.com", "FFFFFF80", "00000000", &appclipcode.Options{Type: appclipcode.CodeTypeNFC})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := string(svg)
+	if !strings.Contains(s, `stroke:#ffffff80`) {
+		t.Error("missing foreground alpha in arcs")
+	}
+	if !strings.Contains(s, `fill:#00000000`) {
+		t.Error("missing transparent background fill")
+	}
+	if !strings.Contains(s, `fill:#88888840;isolation:isolate`) {
+		t.Error("missing derived third-color alpha")
+	}
+}
+
 func TestGenerateWithTemplate(t *testing.T) {
 	svg, err := appclipcode.GenerateWithTemplate("https://example.com", 4, nil)
 	if err != nil {

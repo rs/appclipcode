@@ -7,11 +7,15 @@ import (
 )
 
 type Color struct {
-	R, G, B uint8
+	R, G, B, A uint8
 }
 
 func (c Color) Hex() string {
-	return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B)
+	if c.A == 0xFF {
+		return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B)
+	}
+
+	return fmt.Sprintf("#%02x%02x%02x%02x", c.R, c.G, c.B, c.A)
 }
 
 type Palette struct {

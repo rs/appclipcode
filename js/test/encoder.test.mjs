@@ -50,6 +50,14 @@ test("generate emits SVG with custom colors and NFC logo", () => {
   assert.match(svg, /fill:#000000/);
 });
 
+test("generate preserves explicit alpha bytes in emitted svg colors", () => {
+  const svg = generate("https://example.com", "FFFFFF80", "00000000", { type: CodeTypeNFC });
+
+  assert.match(svg, /stroke:#ffffff80/);
+  assert.match(svg, /fill:#00000000/);
+  assert.match(svg, /fill:#88888840;isolation:isolate/);
+});
+
 test("generated arcs match Apple's comprehensive reference SVG corpus", () => {
   const vectors = loadComprehensiveVectors();
 

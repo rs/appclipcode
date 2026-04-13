@@ -189,11 +189,11 @@ Represents one of the built-in color templates.
 #### `Color`
 
 ```ts
-new Color(r, g, b)
+new Color(r, g, b, a?)
 ```
 
-Represents an RGB color. The `hex()` method returns a lowercase CSS hex string
-such as `#ff3b30`.
+Represents an RGBA color. Alpha defaults to `0xff` when omitted. The `hex()`
+method returns a lowercase CSS hex string such as `#ff3b30` or `#ff3b3080`.
 
 #### `GaloisField`
 
@@ -223,7 +223,7 @@ Returns:
 
 Notes:
 
-- `foreground` and `background` must be 6-digit hex RGB strings
+- `foreground` and `background` must be 6- or 8-digit hex strings (`RRGGBB` or `RRGGBBAA`)
 - the third palette color is inferred from built-in template matches or computed
   as the midpoint between foreground and background
 
@@ -283,7 +283,8 @@ Returns:
 
 #### `parseHexColor(value)`
 
-Parses a 6-digit hex color string and returns a `Color`.
+Parses a 6- or 8-digit hex color string and returns a `Color`. When alpha is
+omitted, it defaults to opaque.
 
 #### `templates()`
 
