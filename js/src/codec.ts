@@ -8,9 +8,9 @@ import {
   SPQ_SYMBOLS,
 } from "./codec-data.js";
 import {
-  CPQ_TRIE_DEFLATE_BASE64,
-  HOST_TRIE_DEFLATE_BASE64,
-  SPQ_TRIE_DEFLATE_BASE64,
+  CPQ_TRIE_PACKED_DEFLATE_BASE64,
+  HOST_TRIE_PACKED_DEFLATE_BASE64,
+  SPQ_TRIE_PACKED_DEFLATE_BASE64,
 } from "./trie-data.generated.js";
 import { inflateSync } from "fflate";
 
@@ -46,6 +46,11 @@ let cpqCoder: MultiContextHuffmanCoder | undefined;
 let spqCoder: MultiContextHuffmanCoder | undefined;
 let tldCoderCache: HuffmanCoder | undefined;
 let initError: Error | undefined;
+
+interface SymbolCoder {
+  encode(symbolIndex: number): string;
+  canEncode(symbolIndex: number): boolean;
+}
 
 export class GaloisField {
   readonly expTbl: number[];
@@ -148,9 +153,12 @@ export class RSEncoder {
 const GF16 = new GaloisField(0x13, 16, 0);
 const GF256 = new GaloisField(0x11d, 256, 1);
 
-class SymbolFrequencyTrie {
+class PackedHuffmanTrie {
   readonly numSymbols: number;
   readonly maxDepth = 2;
+  readonly symbolIndexBits: number;
+  readonly shapeBitsPerNode: number;
+  readonly bitsPerNode: number;
 
   constructor(
     private readonly data: Uint8Array,
@@ -158,28 +166,76 @@ class SymbolFrequencyTrie {
     filename: string,
   ) {
     this.numSymbols = symbols.length;
+    this.symbolIndexBits = Math.ceil(Math.log2(this.numSymbols));
+    this.shapeBitsPerNode = this.numSymbols * 2 - 1;
+    this.bitsPerNode = this.shapeBitsPerNode + this.numSymbols * this.symbolIndexBits;
     const expectedNodes = 1 + this.numSymbols + this.numSymbols * this.numSymbols;
-    const expectedSize = expectedNodes * this.numSymbols * 2;
+    const expectedSize = Math.ceil((expectedNodes * this.bitsPerNode) / 8);
     if (data.length !== expectedSize) {
       throw new Error(`trie ${filename}: expected ${expectedSize} bytes, got ${data.length}`);
     }
   }
 
-  getFrequencies(nodeOffset: number): number[] {
-    const frequencies = new Array<number>(this.numSymbols).fill(0);
-    const base = nodeOffset * this.numSymbols * 2;
-    for (let i = 0; i < this.numSymbols; i += 1) {
-      frequencies[i] = (this.data[base + i * 2] << 8) | this.data[base + i * 2 + 1];
+  buildCoder(nodeOffset: number): StaticHuffmanCoder {
+    const codes = new Array<string>(this.numSymbols).fill("");
+    const nodeBitOffset = nodeOffset * this.bitsPerNode;
+
+    let bitOffset = nodeBitOffset;
+
+    const walk = (prefix: string): void => {
+      const isLeaf = this.readBit(bitOffset);
+      bitOffset += 1;
+
+      if (isLeaf) {
+        const symbolIndex = this.readBits(bitOffset, this.symbolIndexBits);
+        bitOffset += this.symbolIndexBits;
+        codes[symbolIndex] = prefix === "" ? "0" : prefix;
+        return;
+      }
+
+      walk(`${prefix}0`);
+      walk(`${prefix}1`);
+    };
+
+    walk("");
+
+    if (bitOffset !== nodeBitOffset + this.bitsPerNode) {
+      throw new Error(`trie node ${nodeOffset}: malformed codebook bitstream`);
     }
-    return frequencies;
+
+    return new StaticHuffmanCoder(codes);
   }
 
   childOffset(parentOffset: number, symbolIndex: number): number {
     return this.numSymbols * parentOffset + 1 + symbolIndex;
   }
+
+  private readBit(bitOffset: number): boolean {
+    return ((this.data[bitOffset >> 3] >> (7 - (bitOffset & 7))) & 1) === 1;
+  }
+
+  private readBits(bitOffset: number, count: number): number {
+    let value = 0;
+    for (let i = 0; i < count; i += 1) {
+      value = (value << 1) | (((this.data[(bitOffset + i) >> 3] >> (7 - ((bitOffset + i) & 7))) & 1) === 1 ? 1 : 0);
+    }
+    return value;
+  }
 }
 
-class HuffmanCoder {
+class StaticHuffmanCoder implements SymbolCoder {
+  constructor(private readonly codes: string[]) {}
+
+  encode(symbolIndex: number): string {
+    return this.codes[symbolIndex] ?? "";
+  }
+
+  canEncode(symbolIndex: number): boolean {
+    return symbolIndex >= 0 && symbolIndex < this.codes.length && this.codes[symbolIndex] !== "";
+  }
+}
+
+class HuffmanCoder implements SymbolCoder {
   readonly codes: string[];
 
   constructor(freqs: number[], symbols: string[]) {
@@ -266,18 +322,18 @@ function compareNodes(a: HuffmanNode, b: HuffmanNode): number {
 
 class MultiContextHuffmanCoder {
   private readonly symbolIndexByValue = new Map<string, number>();
-  private readonly cache = new Map<number, HuffmanCoder>();
+  private readonly cache = new Map<number, SymbolCoder>();
 
-  constructor(readonly trie: SymbolFrequencyTrie) {
+  constructor(readonly trie: PackedHuffmanTrie) {
     trie.symbols.forEach((symbol, index) => this.symbolIndexByValue.set(symbol, index));
   }
 
-  coderForNode(nodeOffset: number): HuffmanCoder {
+  coderForNode(nodeOffset: number): SymbolCoder {
     const cached = this.cache.get(nodeOffset);
     if (cached) {
       return cached;
     }
-    const coder = new HuffmanCoder(this.trie.getFrequencies(nodeOffset), this.trie.symbols);
+    const coder = this.trie.buildCoder(nodeOffset);
     this.cache.set(nodeOffset, coder);
     return coder;
   }
@@ -336,18 +392,18 @@ function ensureInit(): void {
   }
 
   try {
-    hostCoder = new MultiContextHuffmanCoder(loadTrie(HOST_TRIE_DEFLATE_BASE64, "h.data", HOST_SYMBOLS));
-    cpqCoder = new MultiContextHuffmanCoder(loadTrie(CPQ_TRIE_DEFLATE_BASE64, "cpq.data", CPQ_SYMBOLS));
-    spqCoder = new MultiContextHuffmanCoder(loadTrie(SPQ_TRIE_DEFLATE_BASE64, "spq.data", SPQ_SYMBOLS));
+    hostCoder = new MultiContextHuffmanCoder(loadTrie(HOST_TRIE_PACKED_DEFLATE_BASE64, "h.data", HOST_SYMBOLS));
+    cpqCoder = new MultiContextHuffmanCoder(loadTrie(CPQ_TRIE_PACKED_DEFLATE_BASE64, "cpq.data", CPQ_SYMBOLS));
+    spqCoder = new MultiContextHuffmanCoder(loadTrie(SPQ_TRIE_PACKED_DEFLATE_BASE64, "spq.data", SPQ_SYMBOLS));
   } catch (error) {
     initError = error instanceof Error ? error : new Error(String(error));
     throw initError;
   }
 }
 
-function loadTrie(base64: string, filename: string, symbols: string[]): SymbolFrequencyTrie {
+function loadTrie(base64: string, filename: string, symbols: string[]): PackedHuffmanTrie {
   const data = inflateSync(decodeBase64(base64));
-  return new SymbolFrequencyTrie(data, symbols, filename);
+  return new PackedHuffmanTrie(data, symbols, filename);
 }
 
 function decodeBase64(base64: string): Uint8Array {

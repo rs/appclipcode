@@ -9,9 +9,21 @@ const dataDir = path.join(rootDir, "data");
 const outputFile = path.join(rootDir, "src", "trie-data.generated.ts");
 
 const files = [
-  { name: "h.data", exportName: "HOST_TRIE_DEFLATE_BASE64" },
-  { name: "cpq.data", exportName: "CPQ_TRIE_DEFLATE_BASE64" },
-  { name: "spq.data", exportName: "SPQ_TRIE_DEFLATE_BASE64" },
+  {
+    name: "h.data",
+    exportName: "HOST_TRIE_PACKED_DEFLATE_BASE64",
+    symbols: Array.from("-.0123456789abcdefghijklmnopqrstuvwxyz|"),
+  },
+  {
+    name: "cpq.data",
+    exportName: "CPQ_TRIE_PACKED_DEFLATE_BASE64",
+    symbols: Array.from("#%&+,-./0123456789:;=?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"),
+  },
+  {
+    name: "spq.data",
+    exportName: "SPQ_TRIE_PACKED_DEFLATE_BASE64",
+    symbols: Array.from("&+-./0123456789=?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz|"),
+  },
 ];
 
 const lines = [
@@ -20,9 +32,141 @@ const lines = [
   "",
 ];
 
+function packTrie(data, filename, symbols) {
+  const numSymbols = symbols.length;
+  const nodeCount = 1 + numSymbols + numSymbols * numSymbols;
+  const rowSize = numSymbols * 2;
+  const expectedSize = nodeCount * rowSize;
+  if (data.length !== expectedSize) {
+    throw new Error(`trie ${filename}: expected ${expectedSize} bytes, got ${data.length}`);
+  }
+
+  const writer = new BitWriter();
+  writer.setSymbolIndexBits(Math.ceil(Math.log2(numSymbols)));
+
+  for (let nodeOffset = 0; nodeOffset < nodeCount; nodeOffset += 1) {
+    const frequencies = readFrequencies(data, nodeOffset * rowSize, numSymbols);
+    const tree = buildTree(frequencies, symbols, filename, nodeOffset);
+    writeTree(writer, tree);
+  }
+
+  return writer.finish();
+}
+
+function readFrequencies(data, base, numSymbols) {
+  const frequencies = new Array(numSymbols).fill(0);
+  for (let i = 0; i < numSymbols; i += 1) {
+    frequencies[i] = (data[base + i * 2] << 8) | data[base + i * 2 + 1];
+  }
+  return frequencies;
+}
+
+function buildTree(frequencies, symbols, filename, nodeOffset) {
+  const leaves = frequencies
+    .map((freq, symbolIndex) => ({
+      freq,
+      symbolIndex,
+      left: undefined,
+      right: undefined,
+      leftmost: symbols[symbolIndex] ?? "",
+    }))
+    .filter((node) => node.freq > 0);
+
+  if (leaves.length !== symbols.length) {
+    throw new Error(
+      `trie ${filename}: expected all ${symbols.length} symbols to be encodable at node ${nodeOffset}, got ${leaves.length}`,
+    );
+  }
+
+  const nodes = leaves;
+  while (nodes.length > 1) {
+    nodes.sort(compareNodes);
+    const left = nodes.shift();
+    const right = nodes.shift();
+    nodes.push({
+      freq: left.freq + right.freq,
+      symbolIndex: -1,
+      left,
+      right,
+      leftmost: left.leftmost,
+    });
+  }
+
+  return nodes[0];
+}
+
+function compareNodes(a, b) {
+  if (a.freq !== b.freq) {
+    return a.freq - b.freq;
+  }
+  if (a.leftmost < b.leftmost) {
+    return -1;
+  }
+  if (a.leftmost > b.leftmost) {
+    return 1;
+  }
+  return 0;
+}
+
+function writeTree(writer, node) {
+  if (!node.left && !node.right) {
+    writer.writeBit(true);
+    writer.writeBits(node.symbolIndex, writer.symbolIndexBits);
+    return;
+  }
+
+  writer.writeBit(false);
+  writeTree(writer, node.left);
+  writeTree(writer, node.right);
+}
+
+class BitWriter {
+  constructor() {
+    this.bytes = [];
+    this.currentByte = 0;
+    this.bitsInCurrentByte = 0;
+    this.symbolIndexBits = 0;
+  }
+
+  bytes;
+  currentByte;
+  bitsInCurrentByte;
+  symbolIndexBits;
+
+  setSymbolIndexBits(bits) {
+    this.symbolIndexBits = bits;
+  }
+
+  writeBit(bit) {
+    this.currentByte = (this.currentByte << 1) | (bit ? 1 : 0);
+    this.bitsInCurrentByte += 1;
+
+    if (this.bitsInCurrentByte === 8) {
+      this.bytes.push(this.currentByte);
+      this.currentByte = 0;
+      this.bitsInCurrentByte = 0;
+    }
+  }
+
+  writeBits(value, count) {
+    for (let bitIndex = count - 1; bitIndex >= 0; bitIndex -= 1) {
+      this.writeBit(((value >> bitIndex) & 1) === 1);
+    }
+  }
+
+  finish() {
+    if (this.bitsInCurrentByte > 0) {
+      this.currentByte <<= 8 - this.bitsInCurrentByte;
+      this.bytes.push(this.currentByte);
+    }
+    return Buffer.from(this.bytes);
+  }
+}
+
 for (const file of files) {
   const content = fs.readFileSync(path.join(dataDir, file.name));
-  const compressed = zlib.deflateRawSync(content, { level: 9 });
+  const packed = packTrie(content, file.name, file.symbols);
+  const compressed = zlib.deflateRawSync(packed, { level: 9 });
   const base64 = compressed.toString("base64");
   lines.push(`export const ${file.exportName}: string =`);
   lines.push(`  ${JSON.stringify(base64)};`);

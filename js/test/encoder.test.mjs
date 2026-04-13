@@ -50,21 +50,25 @@ test("generate emits SVG with custom colors and NFC logo", () => {
   assert.match(svg, /fill:#000000/);
 });
 
-test("generated arcs match Apple's reference SVGs for known fixtures", () => {
-  const fixtures = [
-    { url: "https://example.com", file: "apple_0.svg" },
-    { url: "https://a.co", file: "apple_1.svg" },
-    { url: "https://www.apple.com", file: "apple_2.svg" },
-    { url: "https://appclip.example.com", file: "apple_4.svg" },
-  ];
+test("generated arcs match Apple's comprehensive reference SVG corpus", () => {
+  const vectors = loadComprehensiveVectors();
 
-  for (const fixture of fixtures) {
-    const generated = generateWithTemplate(fixture.url, 0);
-    const reference = fs.readFileSync(path.join(repoRoot, "testdata", fixture.file), "utf8");
+  for (const vector of vectors) {
+    const generated = generateWithTemplate(vector.url, 0);
+    const reference = fs.readFileSync(
+      path.join(repoRoot, "testdata", "apple_comprehensive", vector.file),
+      "utf8",
+    );
 
-    assert.deepEqual(extractRingArcs(generated), extractRingArcs(reference), fixture.url);
+    assert.deepEqual(extractRingArcs(generated), extractRingArcs(reference), vector.url);
   }
 });
+
+function loadComprehensiveVectors() {
+  return JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "testdata", "comprehensive_vectors.json"), "utf8"),
+  );
+}
 
 function extractRingArcs(svg) {
   const result = [];
