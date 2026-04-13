@@ -2,9 +2,12 @@
 
 <img src="assets/demo.svg" width="200" align="right">
 
-`appclipcode` is a pure Go implementation of Apple's App Clip Code format.
+`appclipcode` provides Go and JavaScript/TypeScript implementations of Apple's
+App Clip Code format.
 
-Apple ships those circular App Clip Codes, but does not document the format. This project reverse engineered the full pipeline and rebuilt it in Go.
+Apple ships those circular App Clip Codes, but does not document the format.
+This project reverse engineered the full pipeline and rebuilt it in multiple
+implementations.
 
 It can:
 
@@ -21,6 +24,15 @@ Under the hood, it reimplements:
 3. App Clip Code SVG rendering
 
 The reverse-engineering write-up lives in [SPEC.md](./SPEC.md).
+
+## Implementations
+
+This repository currently includes two implementations:
+
+- Go: the main library and CLI in the repository root, with generation,
+  SVG decoding, and raster-image scanning support
+- JavaScript / TypeScript: the package in [`js/`](./js), focused on the
+  encoder path and SVG generation, with a local `appclipcode` CLI
 
 ## Why I Built This
 
@@ -65,6 +77,8 @@ That includes:
 
 ## Install
 
+### Go
+
 Library:
 
 ```bash
@@ -77,7 +91,25 @@ CLI:
 go install github.com/rs/appclipcode/cmd/appclipcodegen@latest
 ```
 
+### JavaScript / TypeScript
+
+Install the published package from npm:
+
+```bash
+npm install appclipcode
+```
+
+Use the published CLI directly from npm:
+
+```bash
+npx appclipcode https://example.com --index 0 -o code.svg
+```
+
+The source for the JS implementation lives in [`js/`](./js).
+
 ## Quick Start
+
+### Go CLI
 
 Generate an SVG:
 
@@ -95,6 +127,36 @@ List the built-in visual templates:
 
 ```bash
 appclipcodegen templates
+```
+
+### JavaScript / TypeScript
+
+Generate an SVG with a built-in template from the JS package:
+
+```bash
+npx appclipcode https://example.com --index 0 -o code.svg
+```
+
+Generate an SVG with custom colors:
+
+```bash
+npx appclipcode https://example.com --fg FFFFFF --bg 000000 -o code.svg
+```
+
+Generate from code with a predefined template:
+
+```ts
+import { generateWithTemplate } from "appclipcode";
+
+const svg = generateWithTemplate("https://example.com", 0);
+```
+
+Generate from code with custom colors:
+
+```ts
+import { generate } from "appclipcode";
+
+const svg = generate("https://example.com", "FFFFFF", "000000");
 ```
 
 ## Library Usage
